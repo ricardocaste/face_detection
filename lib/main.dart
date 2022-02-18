@@ -1,9 +1,8 @@
+
 import 'dart:io';
-
-import 'package:firebase_ml_vision/firebase_ml_vision.dart';
-import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
-
+import 'package:flutter/material.dart';
+import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:image_picker/image_picker.dart';
 
 void main() {
@@ -11,7 +10,6 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -28,7 +26,8 @@ class FaceDetection extends StatefulWidget {
 
 class _FaceDetectionState extends State<FaceDetection> {
   ui.Image image;
-  List<Rect> rects = List<Rect>();
+  List<Rect> rects = [];
+  bool isSmiling = false;
 
   @override
   Widget build(BuildContext context) {
@@ -47,33 +46,47 @@ class _FaceDetectionState extends State<FaceDetection> {
       ),
       body: Container(
         child: Center(
-          child: FittedBox(
-            child: SizedBox(
-              height: image == null ? height : image.height.toDouble(),
-              width: image == null ? width : image.width.toDouble(),
-              child: CustomPaint(
-                painter: Painter(rects, image),
+          child: Column(
+            children: [
+              FittedBox(
+                child: SizedBox(
+                  height: image == null ? height / 2 : image.height.toDouble(),
+                  width: image == null ? width : image.width.toDouble(),
+                  child: CustomPaint(
+                    painter: Painter(rects, image),
+                  ),
+                ),
               ),
-            ),
-          ),
+              SizedBox(height: 30),
+              if (image != null)
+                Text(
+                  isSmiling ? "Smiling 😀" : "Not Smiling 😕",
+                  style: TextStyle(color: Colors.white, fontSize: 20)
+                ),
+            ],
+          )
+          
+
         ),
       ),
     );
   }
 
   Future getImage() async {
-    File imageFile = await ImagePicker.pickImage(source: ImageSource.gallery);
+    XFile imagePickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final inputImage = InputImage.fromFilePath(imagePickedFile.path);
 
-    FirebaseVisionImage firebaseVisionImage = FirebaseVisionImage.fromFile(imageFile);
-    FaceDetector faceDetector = FirebaseVision.instance.faceDetector();
+    final faceDetector = GoogleMlKit.vision.faceDetector();
 
-    List<Face> listOfFaces = await faceDetector.processImage(firebaseVisionImage);
+    final List<Face> faces = await faceDetector.processImage(inputImage);
+
     rects.clear();
-    for (Face face in listOfFaces) {
+    for (Face face in faces) {
+      isSmiling = face.smilingProbability >= 0.6;
       rects.add(face.boundingBox);
     }
 
-    var bytesFromImageFile = imageFile.readAsBytesSync();
+    var bytesFromImageFile = await imagePickedFile.readAsBytes();
     decodeImageFromList(bytesFromImageFile).then((img) {
       setState(() {
         image = img;
@@ -87,7 +100,6 @@ class Painter extends CustomPainter {
   ui.Image image;
 
   Painter(@required this.rects, @required this.image);
-
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -109,5 +121,4 @@ class Painter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
   }
-
 }
